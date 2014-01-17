@@ -1,0 +1,19 @@
+{
+  "name": "dom",
+  "repo": "pixbi/dom",
+  "description": "Sensible DOM manipulation",
+  "version": "0.0.0",
+  "keywords": [],
+  "main": "lib/script.js",
+  "dependencies": {
+    "component/domify": "*"
+  },
+  "scripts": [
+    "lib/script.coffee"
+  ],
+  "styles": [
+  ],
+  "templates": [
+  ],
+  "license": "MIT"
+}
