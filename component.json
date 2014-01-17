@@ -6,7 +6,8 @@
   "keywords": [],
   "main": "lib/script.js",
   "dependencies": {
-    "component/domify": "*"
+    "component/domify": "*",
+    "kenhkan/riotjs": "*"
   },
   "scripts": [
     "lib/script.coffee"
