@@ -74,7 +74,7 @@ exports.compile = (template) ->
     # Convert template string into DOM elements
     root: domify template
 
-# Link additional DOM elements given a bindings object by specifying class
+# Bind additional DOM elements given a bindings object by specifying class
 # names
 #
 # @param {Object.<string, Element>} bindings The bindings object
@@ -82,7 +82,7 @@ exports.compile = (template) ->
 #   references to the DOM elements pointed to by an array of class names, each
 #   of which is passed to `getElementByClassName(1)`
 # @returns {Object.<string, Element>} The bindings object
-exports.link = (bindings, selctors) ->
+exports.bind = (bindings, selctors) ->
   # Go through each selector
   for name, classes of selectors
     # Do not interfere with root
@@ -102,7 +102,35 @@ exports.link = (bindings, selctors) ->
   # Return the new bindings
   bindings
 
-# Commit DOM element in batches
+# Search a DOM tree as defined in the provided bindings object for components
+# and link them to the bindings object as well as the DOM tree by doing the
+# following:
+#
+#   1. Search for elements with class name `component`
+#   2. Extract attributes `component-source` and `component-name`
+#   3. A new instance of `component-source` component is created
+#   4. The bindings object of the new instance is assigned to the provided
+#      bindings object (i.e. this function's parameter) with the key of
+#      `component-name`
+#   5. The DOM tree created from it (i.e. the `root` of the instance's bindings
+#      object) is injected in place of the definition of the component in the
+#      DOM tree of the containing component
+#
+# This function returns the bindings object with references to the components
+# added in the linking process.
+#
+# @param {Object.<string, Element>} The bindings object
+# @returns {Object.<string, Element>} The bindings object with references to
+#   the new instance
+exports.link = (bindings) ->
+  # There must be a `root` element
+  throw new Error 'There must be a `root` property in the bindings object'  unless bindings.root
+  throw new Error 'The root property must be a DOM element'  unless bindings.root.getElementByClassName
+
+# Commit DOM element in batches. We require the element and pass the same thing
+# back to reserve the right to perform some additional operations on the
+# element or wrap it around some function. It does not do anything to it
+# currently but we may in the future.
 #
 # @param {Element} elem A DOM element
 # @param {Function} committer A function to be called when the element is ready
@@ -110,5 +138,5 @@ exports.link = (bindings, selctors) ->
 exports.commit = (elem, committer) ->
   # Save the DOM execution
   queue.push -> committer elem
-  # Then start the run-loop at the end of this cycle
+  # Then start the run-loop at the end of this queue
   setTimeout runloop, 0
