@@ -14,17 +14,10 @@ queue = []
 # @type Element
 phantomDom = null
 
-# We need to keep a count of how many DOM operations have happened. If there is
-# none, do not commit to DOM even if we end a run-loop.
-#
-# @private
-# @type number
-opsCount = 0
 
-
-# Bootstrap the DOM manager on an element. The bootstrapped DOM should never be
-# part of another bootstrapped DOM. It is not a good idea to have two run-loops
-# monitoring for changes in a common sub-tree at once.
+# Bootstrap the DOM manager on an element. Note that it is impossible to
+# bootstrap on two DOM trees on a page. Calling `bootstrap(1)` twice would
+# un-manage the first DOM tree.
 #
 # The best strategy is to bootstrap on `document.body`. If that is not
 # possible, bootstrap on the common ancester of all the relevant DOM elements
@@ -50,25 +43,17 @@ exports.bootstrap = (liveDom) ->
 # @private
 # @function
 runloop = ->
-  # If the queue is already empty
-  if queue.length is 0
-    # Commit content to DOM, but only if there has been DOM operation performed
-    if opsCount > 0
-      liveElem.innerHTML = phantomElem.outerHTML
-      opsCount = 0
-    # And no need to keep running
-    return
+  # No need to continue if the queue is already empty
+  return if queue.length is 0
 
-  # Copy over the queue and clear the old one
+  # Copy over the queue and clear the old one. We must do this before the
+  # callback invocations below because the callbacks may add to the queue by
+  # committing additional DOM operations
   _queue = queue
   queue = []
 
   # Run everything in the queue
-  for callback in _queue
-    callback()
-    # We don't know whether the callback actually performs any DOM operation,
-    # but we'd assume so
-    opsCount++
+  callback() for callback in _queue
 
   # Make sure run-loop runs again at the end
   setTimeout runloop, 0
@@ -84,7 +69,7 @@ runloop = ->
 # @param {string} template An HTML string to compile
 # @returns {Object.<string, Element>} The bindings object
 exports.compile = (template) ->
-  # Make a bindings object that is observablE
+  # Make a bindings object that is observable
   $.observable
     # Convert template string into DOM elements
     root: domify template
