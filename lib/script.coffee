@@ -1,6 +1,13 @@
 $ = require 'riotjs'
 domify = require 'domify'
 
+# The class name to search for components
+#
+# @private
+# @constant
+# @type string
+COMPONENT_CLASS_NAME = 'component'
+
 # Queue all DOM operations
 #
 # @private
@@ -81,7 +88,7 @@ exports.compile = (template) ->
 # @param {Object.<string, Array.<string>>} selectors Selectors that set up
 #   references to the DOM elements pointed to by an array of class names, each
 #   of which is passed to `getElementByClassName(1)`
-# @returns {Object.<string, Element>} The bindings object
+# @returns {Object.<string, Array.<Element>>} The bindings object
 exports.bind = (bindings, selctors) ->
   # Go through each selector
   for name, classes of selectors
@@ -96,8 +103,9 @@ exports.bind = (bindings, selctors) ->
       # Each level is passed to `getElementByClassName`
       ref = ref.getElementByClassName _class
 
-    # Commit the reference point
-    bindings.name = ref
+    # Commit the reference points
+    bindings[name] ?= []
+    bindings[name].push ref
 
   # Return the new bindings
   bindings
@@ -123,9 +131,44 @@ exports.bind = (bindings, selctors) ->
 # @returns {Object.<string, Element>} The bindings object with references to
 #   the new instance
 exports.link = (bindings) ->
-  # There must be a `root` element
-  throw new Error 'There must be a `root` property in the bindings object'  unless bindings.root
-  throw new Error 'The root property must be a DOM element'  unless bindings.root.getElementByClassName
+  # There must be a `root` DOM element
+  unless bindings.root
+    throw new Error 'There must be a `root` property in the bindings object'
+  unless bindings.root.getElementByClassName
+    throw new Error 'The root property must be a DOM element'
+
+  # Search for all components using an existing function
+  exports.bind bindings,
+    _components: [COMPONENT_CLASS_NAME]
+
+  # Go through each component
+  for componentElement in bindings.components
+    # Extract the source and the name
+    source = componentElement.getAttribute "#{COMPONENT_CLASS_NAME}-source"
+    name = componentElement.getAttribute "#{COMPONENT_CLASS_NAME}-name"
+    # Skip if there's no source or name
+    continue unless source and name
+
+    # Extract parameters
+    try
+      params = JSON.parse componentElement.getAttribute "#{COMPONENT_CLASS_NAME}-params"
+    catch error
+      params = {}
+
+    # Instantiate
+    instanceBindings = require(source).create params
+    # Bind to the linking component
+    bindings[name] = instanceBindings
+    # Replace the declaration DOM with the DOM of the instance in the linking
+    # component's own DOM tree
+    component.parentNode.insertBefore instanceBindings.root, componentElement
+    component.parentNode.removeChild componentElement
+
+  # Clean the bindings up of the old component elements
+  delete bindings._components
+
+  # Return the updated bindings object
+  bindings
 
 # Commit DOM element in batches. We require the element and pass the same thing
 # back to reserve the right to perform some additional operations on the
