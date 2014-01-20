@@ -54,7 +54,7 @@ runLoop = ->
   return if runLoopCallCount > 0
 
   # Detach root from document, if there is a managed DOM tree
-  siblingDom = rootDom.nextSibling
+  siblingDom = rootDom?.nextSibling
   containerDom?.removeChild rootDom
 
   # Flush all DOM operations
