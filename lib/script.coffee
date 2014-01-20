@@ -159,12 +159,23 @@ exports.bootstrap = (dom, bindings) ->
 # [Riot.js](https://github.com/moot/riotjs) specifically.
 #
 # @param {string} template An HTML string to compile
+# @param {Object.<string, Element>} [bindings] The bindings object
+# @param {string} [name] The name to bind the element to, if you would like to
+#   append to a bindings object
 # @returns {Object.<string, Element>} The bindings object
-exports.compile = (template) ->
-  # Make a bindings object that is observable
-  $.observable
-    # Convert template string into DOM elements
-    root: wrapElements [domify template]
+exports.compile = (template, bindings, name) ->
+  # The binding is a function yielding the element
+  binding = wrapElements [domify template]
+
+  # Append if desired
+  if bindings? and name?
+    setBinding bindings, name, binding
+
+  else
+    # Make a bindings object that is observable
+    $.observable
+      # Convert template string into DOM elements
+      root: binding
 
 # Bind additional DOM elements given a bindings object by specifying class
 # names.
