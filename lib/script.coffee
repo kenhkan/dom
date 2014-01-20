@@ -159,23 +159,13 @@ exports.bootstrap = (dom, bindings) ->
 # [Riot.js](https://github.com/moot/riotjs) specifically.
 #
 # @param {string} template An HTML string to compile
-# @param {Object.<string, Element>} [bindings] The bindings object
-# @param {string} [name] The name to bind the element to, if you would like to
-#   append to a bindings object
+# @param {Object.<string, Element>} [bindings] The bindings object, if you
+#   would like to append to an existing bindings object
+# @param {string} [name] The name to bind the element to
 # @returns {Object.<string, Element>} The bindings object
-exports.compile = (template, bindings, name) ->
+exports.compile = (template, bindings = $.observable({}), name = 'root') ->
   # The binding is a function yielding the element
-  binding = wrapElements [domify template]
-
-  # Append if desired
-  if bindings? and name?
-    setBinding bindings, name, binding
-
-  else
-    # Make a bindings object that is observable
-    $.observable
-      # Convert template string into DOM elements
-      root: binding
+  setBinding bindings, name, wrapElements [domify template]
 
 # A convenience function that takes an object whose keys are the binding keys
 # and the values are templates to be compiled. There must be at least one key
@@ -183,16 +173,11 @@ exports.compile = (template, bindings, name) ->
 #
 # @param {Object.<string, Element>} [bindings] The bindings object
 exports.compileAll = (templates) ->
-  # Extract `root`...
-  root = templates.root
-  delete templates.root
-
-  # ... because there must be one
-  unless root?
+  unless templates.root?
     throw new Error 'There must be a `root` property'
 
-  # First create a bindings object
-  bindings = exports.compile root
+  # Start a bindings object
+  bindings = $.observable {}
 
   # Go through each template and compile as normal bindings
   for key, template of templates
