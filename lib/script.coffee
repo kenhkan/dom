@@ -45,16 +45,18 @@ runLoop = ->
   # Also stop when we're not at the end yet (i.e. there is still pending call)
   return if runLoopCallCount > 0
 
-  # Detach root from document
-  rootParentDom = rootDom.parent
-  rootNextSiblingDom = rootDom.nextSibling
-  rootParentDom.removeChild rootDom
+  # Detach root from document, if there is a managed DOM tree
+  if rootDom?
+    rootParentDom = rootDom.parent
+    rootNextSiblingDom = rootDom.nextSibling
+    rootParentDom.removeChild rootDom
 
   # Flush all DOM operations
   flushDom()
 
-  # Re-attach root to document after DOM operations
-  rootParentDom.insertBefore rootDom, rootNextSiblingDom
+  # Re-attach root to document after DOM operations, if there is a managed DOM tree
+  if rootDom?
+    rootParentDom.insertBefore rootDom, rootNextSiblingDom
 
 # Flush pending DOM operations. This does so recursively as the callbacks may
 # induce more DOM operations.
@@ -237,8 +239,9 @@ exports.link = (bindings) ->
     setBinding bindings, name, instanceBindings
     # Replace the declaration DOM with the DOM of the instance in the linking
     # component's own DOM tree
-    component.parentNode.insertBefore instanceBindings.root, componentElement
-    component.parentNode.removeChild componentElement
+    instanceBindings.root (root) ->
+      component.parentNode.insertBefore root, componentElement
+      component.parentNode.removeChild componentElement
 
   # Clean the bindings up of the old component elements
   delete bindings._components
