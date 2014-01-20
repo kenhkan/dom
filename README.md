@@ -19,7 +19,3 @@ the live document is generally more performant than otherwise.
 There is only one file and it is heavily commented. The LoC is clocking only at
 around 100 lines. Reading through it should give you a much better
 understanding of how it works.
-
-## TODO
-
-* Batch updates
