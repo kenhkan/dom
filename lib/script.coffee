@@ -119,23 +119,30 @@ setBinding = (bindings, key, value) ->
   bindings
 
 
-# Bootstrap the DOM manager on an element. Note that it is impossible to
-# bootstrap on two DOM trees on a page. Calling `bootstrap(1)` twice would
-# un-manage the first DOM tree.
+# Bootstrap the DOM manager on an element. Note that it is impossible to manage
+# two DOM trees on a page at once. Calling `bootstrap(1)` twice would remove
+# the first DOM tree before the second DOM tree is inserted into the element.
+# In addition, the content of the managed element is not removed. The root of
+# the bindings object is simply appended to the end of the child nodes of the
+# managed DOM tree.
 #
 # The best strategy is to bootstrap on `document.body`. If that is not
 # possible, bootstrap on the common ancester of all the relevant DOM elements
 # that you're interested in manipulating.
 #
 # @param {Element} dom The DOM element to be managed. You should _never_
-#   touch the DOM after handing over control to `pixbi/dom` as some changes
-#   would be lost
-exports.bootstrap = (dom) ->
+#   touch the DOM after handing over control to `pixbi/dom`
+# @param {Object.<string, Element>} bindings The bindings object
+exports.bootstrap = (dom, bindings) ->
   if document is dom
     throw new Error 'You may not bootstrap on the document itself, try `document.body` instead'
+  unless bindings.root?
+    throw new Error 'The bindings object should always contain a `root` binding function'
 
   # Save the DOM for committing
   rootDom = dom
+  # Replace content of the DOM with the root of the bindings object
+  bindings.root -> rootDom.appendChild this
 
 # Compile an HTML string into a bindings object with the values as DOM
 # elements. This always returns an object containing a `root` pointing to the a
@@ -239,8 +246,8 @@ exports.link = (bindings) ->
     setBinding bindings, name, instanceBindings
     # Replace the declaration DOM with the DOM of the instance in the linking
     # component's own DOM tree
-    instanceBindings.root (root) ->
-      component.parentNode.insertBefore root, componentElement
+    instanceBindings.root ->
+      component.parentNode.insertBefore this, componentElement
       component.parentNode.removeChild componentElement
 
   # Clean the bindings up of the old component elements
