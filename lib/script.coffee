@@ -14,6 +14,14 @@ COMPONENT_CLASS_NAME = 'component'
 # @type Array.<Function>
 queue = []
 
+# This container DOM element. This is the parent of the `rootDom` defined
+# below. Its content should not be altered. `rootDom` is simply appended to it
+# as a child node.
+#
+# @private
+# @type Element
+containerDom = null
+
 # The root DOM element. At the end of the run-loop, we would detach this DOM
 # from the document's DOM and re-insert it after flushing the queued-up DOM
 # operation.
@@ -46,17 +54,14 @@ runLoop = ->
   return if runLoopCallCount > 0
 
   # Detach root from document, if there is a managed DOM tree
-  if rootDom?
-    rootParentDom = rootDom.parent
-    rootNextSiblingDom = rootDom.nextSibling
-    rootParentDom.removeChild rootDom
+  siblingDom = rootDom.nextSibling
+  containerDom?.removeChild rootDom
 
   # Flush all DOM operations
   flushDom()
 
   # Re-attach root to document after DOM operations, if there is a managed DOM tree
-  if rootDom?
-    rootParentDom.insertBefore rootDom, rootNextSiblingDom
+  containerDom?.insertBefore rootDom, siblingDom
 
 # Flush pending DOM operations. This does so recursively as the callbacks may
 # induce more DOM operations.
@@ -130,8 +135,7 @@ setBinding = (bindings, key, value) ->
 # possible, bootstrap on the common ancester of all the relevant DOM elements
 # that you're interested in manipulating.
 #
-# @param {Element} dom The DOM element to be managed. You should _never_
-#   touch the DOM after handing over control to `pixbi/dom`
+# @param {Element} dom The DOM element to be managed
 # @param {Object.<string, Element>} bindings The bindings object
 exports.bootstrap = (dom, bindings) ->
   if document is dom
@@ -139,10 +143,12 @@ exports.bootstrap = (dom, bindings) ->
   unless bindings.root?
     throw new Error 'The bindings object should always contain a `root` binding function'
 
-  # Save the DOM for committing
-  rootDom = dom
-  # Replace content of the DOM with the root of the bindings object
-  bindings.root -> rootDom.appendChild this
+  bindings.root ->
+    # Save the relevant DOM trees
+    containerDom = dom
+    rootDom = this
+    # Add to container
+    containerDom.appendChild rootDom
 
 # Compile an HTML string into a bindings object with the values as DOM
 # elements. This always returns an object containing a `root` pointing to the a
