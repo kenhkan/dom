@@ -282,9 +282,9 @@ exports.link = (bindings) ->
       params = {}
 
     # Instantiate
-    instanceBindings = require(source).create params
+    instnace = require(source).create params
     # Bind to the linking component
-    setBinding bindings, name, instanceBindings
+    setBinding bindings, name, instance.bindings
     # Replace the declaration DOM with the DOM of the instance in the linking
     # component's own DOM tree
     instanceBindings.root ->
