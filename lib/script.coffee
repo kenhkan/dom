@@ -177,6 +177,30 @@ exports.compile = (template, bindings, name) ->
       # Convert template string into DOM elements
       root: binding
 
+# A convenience function that takes an object whose keys are the binding keys
+# and the values are templates to be compiled. There must be at least one key
+# that is `root`.
+#
+# @param {Object.<string, Element>} [bindings] The bindings object
+exports.compileAll = (templates) ->
+  # Extract `root`...
+  root = templates.root
+  delete templates.root
+
+  # ... because there must be one
+  unless root?
+    throw new Error 'There must be a `root` property'
+
+  # First create a bindings object
+  bindings = exports.compile root
+
+  # Go through each template and compile as normal bindings
+  for key, template of templates
+    exports.compile template, bindings, key
+
+  # Return the bindings of course
+  bindings
+
 # Bind additional DOM elements given a bindings object by specifying class
 # names.
 #
