@@ -14,12 +14,13 @@ COMPONENT_CLASS_NAME = 'component'
 # @type Array.<Function>
 queue = []
 
-# The phantom DOM tree contains our DOM that we manipulate. At the end of the
-# run-loop, we would commit this DOM tree into the document's DOM.
+# The root DOM element. At the end of the run-loop, we would detach this DOM
+# from the document's DOM and re-insert it after flushing the queued-up DOM
+# operation.
 #
 # @private
 # @type Element
-phantomDom = null
+rootDom = null
 
 
 # Bootstrap the DOM manager on an element. Note that it is impossible to
@@ -30,27 +31,56 @@ phantomDom = null
 # possible, bootstrap on the common ancester of all the relevant DOM elements
 # that you're interested in manipulating.
 #
-# @param {Element} liveDom The DOM element to be managed. You should _never_
+# @param {Element} dom The DOM element to be managed. You should _never_
 #   touch the DOM after handing over control to `pixbi/dom` as some changes
 #   would be lost
-exports.bootstrap = (liveDom) ->
-  # Copy over what is there right now into the phantom DOM for future
-  # manipulation
-  phantomDom = (new DOMParser).parseFromString liveDom.innerHTML, 'text/xml'
+exports.bootstrap = (dom) ->
+  if document is dom
+    throw new Error 'You may not bootstrap on the document itself, try `document.body` instead'
+
+  # Save the DOM for committing
+  rootDom = dom
+
+# Call count of run-loop. Only commit when it's the last call of the run-loop.
+#
+# The run-loop with this call count works like garbage collection and reference
+# counting.
+#
+# @private
+# @type number
+runLoopCallCount = 0
 
 # The run-loop flushes the queue and to commit the DOM changes when we're at
-# the end of the run-loop. It works by continuously calling itself
-# asynchronously until the queue is empty.
-#
-# Because arbitrary code can run in `commit(2)`, there may be additional
-# immediate `setTimeout(2)`s (i.e. code triggering `window.setTimeout(0);`)
-# triggered before we want to commit to DOM.  Therefore, we want to call
-# `runloop(0)` again at the *end* with a `setTimeout(2)` to check for sure.
+# the end of the run-loop.
 #
 # @private
 # @function
-runloop = ->
-  # No need to continue if the queue is already empty
+runLoop = ->
+  # Decrement call count no matter what
+  runLoopCallCount--
+  # Stop if the queue is already empty
+  return if queue.length is 0
+  # Also stop when we're not at the end yet (i.e. there is still pending call)
+  return if runLoopCallCount > 0
+
+  # Detach root from document
+  rootParentDom = rootDom.parent
+  rootNextSiblingDom = rootDom.nextSibling
+  rootParentDom.removeChild rootDom
+
+  # Flush all DOM operations
+  flushDom()
+
+  # Re-attach root to document after DOM operations
+  rootParentDom.insertBefore rootDom, rootNextSiblingDom
+
+# Flush pending DOM operations. This does so recursively as the callbacks may
+# induce more DOM operations.
+#
+# @private
+# @function
+flushDom = ->
+  # Obviously stop if there's no more to flush
   return if queue.length is 0
 
   # Copy over the queue and clear the old one. We must do this before the
@@ -62,8 +92,29 @@ runloop = ->
   # Run everything in the queue
   callback() for callback in _queue
 
-  # Make sure run-loop runs again at the end
-  setTimeout runloop, 0
+  # Continuously flush
+  flushDom()
+
+# Wrap a DOM element in a function that yields the element (or elements
+# individually) that only gets run at the end of the run-loop.
+#
+# @private
+# @param {Element} element A DOM element
+# @returns {function} A function that yields the element in the run-loop
+wrapElement = (element) ->
+  # This function is called with the function that actually executes the DOM
+  # operation so the parameter function needs access to the DOM element as a
+  # parameter and as the context
+  (operator) ->
+    # Save the DOM execution
+    queue.push ->
+      # Actually operate on the DOM element
+      operator.call element, element
+
+    # Increment the call count
+    runLoopCallCount++
+    # Then start the run-loop at the end
+    setTimeout runLoop, 0
 
 
 # Compile an HTML string into a bindings object with the values as DOM
@@ -82,7 +133,12 @@ exports.compile = (template) ->
     root: domify template
 
 # Bind additional DOM elements given a bindings object by specifying class
-# names
+# names.
+#
+# You want to use `bind(2)` instead of looking up the element with, say, jQuery
+# because you only pay the heavy price of DOM traversal once at the binding
+# stage. This function also uses the native `getElementsByClassName(1)`, which
+# is much faster than the alternatives.
 #
 # @param {Object.<string, Element>} bindings The bindings object
 # @param {Object.<string, Array.<string>>} selectors Selectors that set up
@@ -101,7 +157,7 @@ exports.bind = (bindings, selctors) ->
     # Each selector is an array of classes
     for _class in classes
       # Each level is passed to `getElementByClassName`
-      ref = ref.getElementByClassName _class
+      ref = ref.getElementsByClassName _class
 
     # Commit the reference points
     bindings[name] ?= []
@@ -169,17 +225,3 @@ exports.link = (bindings) ->
 
   # Return the updated bindings object
   bindings
-
-# Commit DOM element in batches. We require the element and pass the same thing
-# back to reserve the right to perform some additional operations on the
-# element or wrap it around some function. It does not do anything to it
-# currently but we may in the future.
-#
-# @param {Element} elem A DOM element
-# @param {Function} committer A function to be called when the element is ready
-#   to be committed
-exports.commit = (elem, committer) ->
-  # Save the DOM execution
-  queue.push -> committer elem
-  # Then start the run-loop at the end of this queue
-  setTimeout runloop, 0
